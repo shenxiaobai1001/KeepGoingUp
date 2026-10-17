@@ -10,6 +10,7 @@ class UUserWidget;
 class UStartMenuWidget;
 class UEndMenuWidget;
 class UGamingHUDWidget;
+class UKeepGoingUpSettingsWidget;
 class AMapCreater;
 class AKeepGoingUpCharacter;
 
@@ -61,6 +62,24 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Prank")
 	bool GetPlayerStartTransform(FTransform& OutTransform) const;
 
+	UFUNCTION(BlueprintPure, Category = "Settings")
+	float GetTileSoundVolume() const { return TileSoundVolume; }
+
+	UFUNCTION(BlueprintPure, Category = "Settings")
+	float GetPrankSoundVolume() const { return PrankSoundVolume; }
+
+	UFUNCTION(BlueprintPure, Category = "Settings")
+	int32 GetStartPitMaxHp() const { return StartPitMaxHp; }
+
+	UFUNCTION(BlueprintPure, Category = "Settings")
+	int32 GetMapLength() const;
+
+	void SetTileSoundVolume(float Volume);
+	void SetPrankSoundVolume(float Volume);
+	void ApplyMapLength(int32 LayerCount);
+	void ApplyStartPitMaxHp(int32 Hp);
+	void CloseSettings();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -80,6 +99,8 @@ protected:
 
 	void BindStartMenuButtons(UUserWidget* Widget);
 	void UnbindStartMenuButtons();
+	void BindSettingsButton(UUserWidget* Widget);
+	void UnbindSettingsButton();
 
 	void ApplyMenuInputMode();
 	void ApplyGameplayInputMode();
@@ -95,6 +116,9 @@ protected:
 
 	UFUNCTION()
 	void HandleStartClicked();
+
+	UFUNCTION()
+	void HandleSettingsClicked();
 
 	UFUNCTION()
 	void HandleExitClicked();
@@ -157,6 +181,13 @@ protected:
 
 	/** Times the player has completed the end sequence this session. */
 	int32 PassCount = 0;
+
+	float TileSoundVolume = 1.f;
+	float PrankSoundVolume = 1.f;
+	int32 StartPitMaxHp = 10000;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UKeepGoingUpSettingsWidget> SettingsWidget;
 
 	int32 FallbackRemainingSeconds = 0;
 	float FallbackPulseElapsed = 0.f;

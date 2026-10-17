@@ -8,6 +8,7 @@
 #include "UI/StartMenuWidget.h"
 #include "UI/EndMenuWidget.h"
 #include "UI/GamingHUDWidget.h"
+#include "UI/KeepGoingUpSettingsWidget.h"
 #include "Blueprint/UserWidget.h"
 #include "Blueprint/WidgetBlueprintLibrary.h"
 #include "Components/Button.h"
@@ -187,6 +188,7 @@ void AKeepGoingUpGameMode::EnterMenuState(bool bResetPlayer)
 		Character->ClearStartPit();
 		Character->EndCarPush();
 		Character->ResetEndSequence();
+		Character->ResetGameSpeed();
 		Character->SetRunGameplayEnabled(false, false);
 		if (bResetPlayer)
 		{
@@ -214,6 +216,7 @@ void AKeepGoingUpGameMode::EnterPlayingState()
 		Character->EndCarPush();
 		Character->ResetEndSequence();
 		Character->SetRunGameplayEnabled(true, true);
+		Character->ApplyGameSpeed();
 	}
 
 	if (CachedMapCreater)
@@ -255,6 +258,7 @@ void AKeepGoingUpGameMode::EnterFinishedState()
 		Character->EndCarPush();
 		// Keep victory pose / camera; no free look during countdown
 		Character->SetRunGameplayEnabled(false, false);
+		UGameplayStatics::SetGlobalTimeDilation(this, 1.f);
 	}
 
 	ApplyFinishedInputMode();
@@ -343,10 +347,12 @@ void AKeepGoingUpGameMode::ShowStartMenu()
 	{
 		TypedStartMenu->OnStartClicked.AddDynamic(this, &AKeepGoingUpGameMode::HandleStartClicked);
 		TypedStartMenu->OnExitClicked.AddDynamic(this, &AKeepGoingUpGameMode::HandleExitClicked);
+		TypedStartMenu->OnSettingClicked.AddDynamic(this, &AKeepGoingUpGameMode::HandleSettingsClicked);
 	}
 	else
 	{
 		BindStartMenuButtons(StartMenuWidget);
+		BindSettingsButton(StartMenuWidget);
 	}
 
 	StartMenuWidget->AddToViewport(100);
@@ -354,12 +360,15 @@ void AKeepGoingUpGameMode::ShowStartMenu()
 
 void AKeepGoingUpGameMode::HideStartMenu()
 {
+	CloseSettings();
+	UnbindSettingsButton();
 	UnbindStartMenuButtons();
 
 	if (TypedStartMenu)
 	{
 		TypedStartMenu->OnStartClicked.RemoveDynamic(this, &AKeepGoingUpGameMode::HandleStartClicked);
 		TypedStartMenu->OnExitClicked.RemoveDynamic(this, &AKeepGoingUpGameMode::HandleExitClicked);
+		TypedStartMenu->OnSettingClicked.RemoveDynamic(this, &AKeepGoingUpGameMode::HandleSettingsClicked);
 		TypedStartMenu = nullptr;
 	}
 
@@ -483,7 +492,6 @@ void AKeepGoingUpGameMode::BindStartMenuButtons(UUserWidget* Widget)
 	{
 		UE_LOG(LogKeepGoingUp, Warning, TEXT("UI_Start: Btn_Exit not found."));
 	}
-	// Btn_Setting intentionally unbound
 }
 
 void AKeepGoingUpGameMode::UnbindStartMenuButtons()
@@ -501,6 +509,116 @@ void AKeepGoingUpGameMode::UnbindStartMenuButtons()
 	{
 		ExitBtn->OnClicked.RemoveDynamic(this, &AKeepGoingUpGameMode::HandleExitClicked);
 	}
+}
+
+void AKeepGoingUpGameMode::BindSettingsButton(UUserWidget* Widget)
+{
+	if (!Widget)
+	{
+		return;
+	}
+
+	if (UButton* SettingsBtn = Cast<UButton>(Widget->GetWidgetFromName(TEXT("Btn_Setting"))))
+	{
+		SettingsBtn->OnClicked.RemoveDynamic(this, &AKeepGoingUpGameMode::HandleSettingsClicked);
+		SettingsBtn->OnClicked.AddDynamic(this, &AKeepGoingUpGameMode::HandleSettingsClicked);
+	}
+	else
+	{
+		UE_LOG(LogKeepGoingUp, Warning, TEXT("UI_Start: Btn_Setting not found."));
+	}
+}
+
+void AKeepGoingUpGameMode::UnbindSettingsButton()
+{
+	if (!StartMenuWidget)
+	{
+		return;
+	}
+
+	if (UButton* SettingsBtn = Cast<UButton>(StartMenuWidget->GetWidgetFromName(TEXT("Btn_Setting"))))
+	{
+		SettingsBtn->OnClicked.RemoveDynamic(this, &AKeepGoingUpGameMode::HandleSettingsClicked);
+	}
+}
+
+void AKeepGoingUpGameMode::HandleSettingsClicked()
+{
+	if (SettingsWidget && SettingsWidget->IsInViewport())
+	{
+		CloseSettings();
+		return;
+	}
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC)
+	{
+		return;
+	}
+
+	SettingsWidget = CreateWidget<UKeepGoingUpSettingsWidget>(PC, UKeepGoingUpSettingsWidget::StaticClass());
+	if (SettingsWidget)
+	{
+		SettingsWidget->AddToViewport(400);
+	}
+}
+
+void AKeepGoingUpGameMode::CloseSettings()
+{
+	if (SettingsWidget)
+	{
+		SettingsWidget->RemoveFromParent();
+		SettingsWidget = nullptr;
+	}
+}
+
+int32 AKeepGoingUpGameMode::GetMapLength() const
+{
+	if (CachedMapCreater)
+	{
+		return CachedMapCreater->GetTotalLayers();
+	}
+	if (AMapCreater* MapCreater = const_cast<AKeepGoingUpGameMode*>(this)->FindMapCreater())
+	{
+		return MapCreater->GetTotalLayers();
+	}
+	return 10000;
+}
+
+void AKeepGoingUpGameMode::SetTileSoundVolume(float Volume)
+{
+	TileSoundVolume = FMath::Clamp(Volume, 0.f, 1.f);
+}
+
+void AKeepGoingUpGameMode::SetPrankSoundVolume(float Volume)
+{
+	PrankSoundVolume = FMath::Clamp(Volume, 0.f, 1.f);
+	if (AKeepGoingUpCharacter* Character = const_cast<AKeepGoingUpGameMode*>(this)->FindPlayerCharacter())
+	{
+		Character->ApplyPrankSoundVolume(PrankSoundVolume);
+	}
+}
+
+void AKeepGoingUpGameMode::ApplyMapLength(int32 LayerCount)
+{
+	AMapCreater* MapCreater = FindMapCreater();
+	if (!MapCreater)
+	{
+		UE_LOG(LogKeepGoingUp, Warning, TEXT("Settings: MapCreater missing, map length not applied."));
+		return;
+	}
+	MapCreater->SetTotalLayers(LayerCount);
+	UE_LOG(LogKeepGoingUp, Log, TEXT("Settings: map length = %d tiles"), MapCreater->GetTotalLayers());
+}
+
+void AKeepGoingUpGameMode::ApplyStartPitMaxHp(int32 Hp)
+{
+	StartPitMaxHp = FMath::Clamp(Hp, 1, 10000000);
+	if (AKeepGoingUpCharacter* Character = FindPlayerCharacter())
+	{
+		Character->SetHeldPitHp(StartPitMaxHp);
+	}
+	UE_LOG(LogKeepGoingUp, Log, TEXT("Settings: start pit HP = %d"), StartPitMaxHp);
 }
 
 void AKeepGoingUpGameMode::ShowEndMenu()
@@ -822,6 +940,7 @@ void AKeepGoingUpGameMode::AbortEndCountdownForPrank()
 		Character->EndCarPush();
 		Character->ResetEndSequence();
 		Character->SetRunGameplayEnabled(true, true);
+		Character->ApplyGameSpeed();
 	}
 
 	if (!CachedMapCreater)

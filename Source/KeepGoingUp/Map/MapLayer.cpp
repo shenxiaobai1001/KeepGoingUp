@@ -2,6 +2,7 @@
 
 #include "Map/MapLayer.h"
 #include "Components/StaticMeshComponent.h"
+#include "KeepGoingUpGameMode.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Sound/SoundBase.h"
@@ -275,7 +276,15 @@ void AMapLayer::PlayRandomPiano()
 	const FString Path = FString::Printf(TEXT("/Game/Game/Audio/piano%d.piano%d"), Index, Index);
 	if (USoundBase* Sound = LoadObject<USoundBase>(nullptr, *Path))
 	{
-		UGameplayStatics::PlaySound2D(this, Sound);
+		float Volume = 1.f;
+		if (UWorld* World = GetWorld())
+		{
+			if (const AKeepGoingUpGameMode* GameMode = World->GetAuthGameMode<AKeepGoingUpGameMode>())
+			{
+				Volume = GameMode->GetTileSoundVolume();
+			}
+		}
+		UGameplayStatics::PlaySound2D(this, Sound, Volume);
 		return;
 	}
 

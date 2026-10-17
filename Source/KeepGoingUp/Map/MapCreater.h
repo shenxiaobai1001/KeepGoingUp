@@ -57,6 +57,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Map")
 	AMapEnd* GetOrCreateMapEnd();
 
+	/** Change the goal tile count. The end marker moves on the next map update. */
+	void SetTotalLayers(int32 NewTotal);
+
 	/** When false, no new car waves spawn (menu / finished). */
 	void SetCarSpawningEnabled(bool bEnabled);
 
@@ -129,7 +132,7 @@ protected:
 	float LayerLength = 100.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Map", meta = (ClampMin = "1"))
-	int32 PoolRadius = 100;
+	int32 PoolRadius = 500;
 
 	/**
 	 * Map length in tiles. Last tile (this index) is BP_End; tiles 1..TotalLayers-1 are BP_Layer.
@@ -181,13 +184,13 @@ protected:
 	float CarMoveSpeed = 2000.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cars", meta = (ClampMin = "0.1"))
-	float CarSpawnInterval = 0.75f;
+	float CarSpawnInterval = 0.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cars", meta = (ClampMin = "1"))
 	int32 CarSpawnCountMin = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Cars", meta = (ClampMin = "1"))
-	int32 CarSpawnCountMax = 4;
+	int32 CarSpawnCountMax = 1;
 
 	/** Random one-shots when the player enters a new tile. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Audio|Layer Enter")

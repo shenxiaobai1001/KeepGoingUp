@@ -2,6 +2,7 @@
 
 #include "Prank/KeepGoingUpPushPrank.h"
 #include "KeepGoingUpCharacter.h"
+#include "KeepGoingUpGameMode.h"
 #include "KeepGoingUp.h"
 #include "Map/MapCreater.h"
 #include "Animation/AnimSequence.h"
@@ -77,7 +78,7 @@ namespace
 			TEXT("/Game/Game/Audio/孙悟空.孙悟空"), TEXT("/Game/Game/Audio/孙悟空循环.孙悟空循环")};
 		static const FPushPrankProfile Vegeta{
 			TEXT("/Game/Game/Code/Barrage/BP_BeiJiTa.BP_BeiJiTa_C"), TEXT("BeiJiTa"),
-			SpawnDistanceUU, false, true, false, false, true, 135.f, SaiyanPushSeconds,
+			SpawnDistanceUU, false, true, false, false, true, -45.f, SaiyanPushSeconds,
 			TEXT("/Game/Game/Audio/贝吉塔.贝吉塔"), TEXT("/Game/Game/Audio/贝吉塔循环.贝吉塔循环")};
 		static const FPushPrankProfile Naruto{
 			TEXT("/Game/Game/Code/Barrage/BP_liudao.BP_liudao_C"), TEXT("Naruto"),
@@ -271,6 +272,7 @@ void AKeepGoingUpPushPrank::SpawnVisual(AMapCreater* MapCreater)
 	}
 	if (Profile.bOpenBeamAfterAnim)
 	{
+		RaiseEffectSortPriority(Visual);
 		SetBeamActive(false);
 	}
 	ApplyVisualAnimation(Visual);
@@ -373,6 +375,41 @@ void AKeepGoingUpPushPrank::SetBeamActive(bool bActive) const
 			{
 				Particles->Deactivate();
 			}
+		}
+	}
+
+	if (bActive)
+	{
+		RaiseEffectSortPriority(Visual);
+	}
+}
+
+void AKeepGoingUpPushPrank::RaiseEffectSortPriority(AActor* Actor) const
+{
+	if (!Actor)
+	{
+		return;
+	}
+
+	TArray<UPrimitiveComponent*> Prims;
+	Actor->GetComponents<UPrimitiveComponent>(Prims);
+	for (UPrimitiveComponent* Prim : Prims)
+	{
+		if (!Prim || Prim->IsA<USkeletalMeshComponent>())
+		{
+			continue;
+		}
+		Prim->TranslucencySortPriority = 1;
+		Prim->MarkRenderStateDirty();
+	}
+
+	TArray<UChildActorComponent*> ChildActorComps;
+	Actor->GetComponents<UChildActorComponent>(ChildActorComps);
+	for (UChildActorComponent* ChildComp : ChildActorComps)
+	{
+		if (AActor* Child = ChildComp ? ChildComp->GetChildActor() : nullptr)
+		{
+			RaiseEffectSortPriority(Child);
 		}
 	}
 }
@@ -579,10 +616,26 @@ void AKeepGoingUpPushPrank::PlayPrankSound(USoundBase* Sound, bool bLoop)
 
 	StopPrankSound();
 	bLoopingSound = bLoop;
-	PrankSound = UGameplayStatics::SpawnSound2D(this, Sound, 1.f, 1.f, 0.f, nullptr, false, false);
+	float Volume = 1.f;
+	if (UWorld* World = GetWorld())
+	{
+		if (const AKeepGoingUpGameMode* GameMode = World->GetAuthGameMode<AKeepGoingUpGameMode>())
+		{
+			Volume = GameMode->GetPrankSoundVolume();
+		}
+	}
+	PrankSound = UGameplayStatics::SpawnSound2D(this, Sound, Volume, 1.f, 0.f, nullptr, false, false);
 	if (PrankSound)
 	{
 		PrankSound->OnAudioFinished.AddUniqueDynamic(this, &AKeepGoingUpPushPrank::HandlePrankSoundFinished);
+	}
+}
+
+void AKeepGoingUpPushPrank::ApplySoundVolume(float Volume)
+{
+	if (PrankSound)
+	{
+		PrankSound->SetVolumeMultiplier(FMath::Clamp(Volume, 0.f, 1.f));
 	}
 }
 

@@ -45,6 +45,9 @@ void AMapCreater::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// Keep 500 tiles behind the player and 500 ahead, even if the Blueprint still says 100.
+	PoolRadius = 500;
+
 	if (!LayerClass)
 	{
 		UE_LOG(LogKeepGoingUp, Error, TEXT("MapCreater: LayerClass is not set. Assign BP_Layer on the actor."));
@@ -61,14 +64,10 @@ void AMapCreater::BeginPlay()
 	}
 	else
 	{
-		// Keep interval modern if an older BP CDO still has 0.5 / 1.0
-		if (CarSpawnInterval < 0.75f - KINDA_SMALL_NUMBER || CarSpawnInterval > 0.75f + KINDA_SMALL_NUMBER)
-		{
-			if (FMath::IsNearlyEqual(CarSpawnInterval, 0.5f) || FMath::IsNearlyEqual(CarSpawnInterval, 1.0f))
-			{
-				CarSpawnInterval = 0.75f;
-			}
-		}
+		// One random car every half second.
+		CarSpawnInterval = 0.5f;
+		CarSpawnCountMin = 1;
+		CarSpawnCountMax = 1;
 		EnsureCarPoolCapacity();
 		CarSpawnTimer = CarSpawnInterval;
 		bCarSpawningEnabled = false; // GameMode enables after UI_Start
@@ -342,6 +341,24 @@ AMapEnd* AMapCreater::GetOrCreateMapEnd()
 {
 	EnsureMapEndPlaced();
 	return MapEndActor;
+}
+
+void AMapCreater::SetTotalLayers(int32 NewTotal)
+{
+	TotalLayers = FMath::Clamp(NewTotal, 2, 1000000);
+	if (!MapEndActor)
+	{
+		return;
+	}
+
+	const bool bWasHidden = MapEndActor->IsHidden();
+	const bool bCollision = MapEndActor->GetActorEnableCollision();
+	EnsureMapEndPlaced();
+	if (bWasHidden)
+	{
+		MapEndActor->SetActorHiddenInGame(true);
+		MapEndActor->SetActorEnableCollision(bCollision);
+	}
 }
 
 void AMapCreater::EnsureMapEndPlaced()

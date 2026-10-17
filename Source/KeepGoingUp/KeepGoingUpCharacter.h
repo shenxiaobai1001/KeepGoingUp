@@ -190,6 +190,8 @@ protected:
 	bool bHeldAtStartPit = false;
 	bool bStartPitFailing = false;
 	int32 StartPitHp = 10000;
+	float StartPitReleaseDelay = 0.f;
+	int32 SpeedGear = 0;
 
 public:
 
@@ -278,6 +280,17 @@ public:
 	/** Leave the BP_Start hold (menu, new run, or a forward push). */
 	void ClearStartPit();
 
+	/** While held at the start, replace the remaining hit HP. */
+	void SetHeldPitHp(int32 NewHp);
+
+	void ApplyPrankSoundVolume(float Volume);
+
+	/** Up arrow raises the speed gear, down arrow lowers it. Fastest is 3x. */
+	void IncreaseGameSpeed();
+	void DecreaseGameSpeed();
+	void ApplyGameSpeed() const;
+	void ResetGameSpeed();
+
 	/** Obstacle car reached the road start while carrying this player. */
 	void EnterStartPit();
 
@@ -323,7 +336,7 @@ protected:
 	bool FindStartPitTransform(FTransform& OutTransform) const;
 	void FailFromStartPit();
 	void StartPushPrank(EKeepGoingUpPushPrankKind Kind);
-	void TickStartPitHold(int32 ForwardTypes, int32 BackwardTypes);
+	void TickStartPitHold(bool bHasKnockback, bool bKnockbackWins, float DeltaSeconds);
 	void TickEndSequence(float DeltaSeconds);
 	void TickPendingTeleport(float DeltaSeconds);
 	bool BeginChuansongTeleport(bool bToRoadEnd);

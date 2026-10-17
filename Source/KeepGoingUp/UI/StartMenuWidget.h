@@ -10,6 +10,7 @@ class UButton;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStartMenuStartClicked);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStartMenuExitClicked);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnStartMenuSettingClicked);
 
 /**
  * Start menu. Reparent UI_Start to this class; keep button names Btn_Start / Btn_Setting / Btn_Exit.
@@ -26,6 +27,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Start Menu")
 	FOnStartMenuExitClicked OnExitClicked;
 
+	UPROPERTY(BlueprintAssignable, Category = "Start Menu")
+	FOnStartMenuSettingClicked OnSettingClicked;
+
 protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
@@ -35,6 +39,9 @@ protected:
 
 	UFUNCTION()
 	void HandleExitClicked();
+
+	UFUNCTION()
+	void HandleSettingClicked();
 
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> Btn_Start;

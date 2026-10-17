@@ -74,6 +74,7 @@ public:
 	AActor* GetVisual() const { return Visual; }
 
 	void Recycle();
+	void ApplySoundVolume(float Volume);
 
 private:
 	void SpawnVisual(AMapCreater* MapCreater);
@@ -81,6 +82,7 @@ private:
 	void AttachVisualAtLocalOffset(float AlongPlayerX);
 	void SnapVisualToPlayer();
 	void SetBeamActive(bool bActive) const;
+	void RaiseEffectSortPriority(AActor* Actor) const;
 	bool IsIntroAnimFinished() const;
 	void DisableVisualCollision(AActor* Actor) const;
 	void StopVisualAnimLoop(AActor* Actor) const;

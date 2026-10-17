@@ -15,7 +15,10 @@ void UStartMenuWidget::NativeConstruct()
 	{
 		Btn_Exit->OnClicked.AddDynamic(this, &UStartMenuWidget::HandleExitClicked);
 	}
-	// Btn_Setting intentionally unbound for now
+	if (Btn_Setting)
+	{
+		Btn_Setting->OnClicked.AddDynamic(this, &UStartMenuWidget::HandleSettingClicked);
+	}
 }
 
 void UStartMenuWidget::NativeDestruct()
@@ -28,8 +31,17 @@ void UStartMenuWidget::NativeDestruct()
 	{
 		Btn_Exit->OnClicked.RemoveDynamic(this, &UStartMenuWidget::HandleExitClicked);
 	}
+	if (Btn_Setting)
+	{
+		Btn_Setting->OnClicked.RemoveDynamic(this, &UStartMenuWidget::HandleSettingClicked);
+	}
 
 	Super::NativeDestruct();
+}
+
+void UStartMenuWidget::HandleSettingClicked()
+{
+	OnSettingClicked.Broadcast();
 }
 
 void UStartMenuWidget::HandleStartClicked()

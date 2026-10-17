@@ -18,6 +18,7 @@
 #include "InputCoreTypes.h"
 #include "Components/InputComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/Engine.h"
 #include "KeepGoingUp.h"
 #include "Map/DistanceWidget.h"
 #include "Map/MapCreater.h"
@@ -263,6 +264,50 @@ void AKeepGoingUpCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInp
 	PlayerInputComponent->BindKey(EKeys::RightShift, IE_Released, this, &AKeepGoingUpCharacter::SprintStop);
 
 	PlayerInputComponent->BindKey(EKeys::Q, IE_Pressed, this, &AKeepGoingUpCharacter::ToggleAutoRun);
+	PlayerInputComponent->BindKey(EKeys::Up, IE_Pressed, this, &AKeepGoingUpCharacter::IncreaseGameSpeed);
+	PlayerInputComponent->BindKey(EKeys::Down, IE_Pressed, this, &AKeepGoingUpCharacter::DecreaseGameSpeed);
+}
+
+namespace
+{
+	constexpr float GameSpeedGears[] = {1.f, 2.f, 3.f};
+	constexpr int32 GameSpeedGearCount = UE_ARRAY_COUNT(GameSpeedGears);
+}
+
+void AKeepGoingUpCharacter::IncreaseGameSpeed()
+{
+	if (!bRunGameplayEnabled)
+	{
+		return;
+	}
+	SpeedGear = FMath::Min(SpeedGear + 1, GameSpeedGearCount - 1);
+	ApplyGameSpeed();
+}
+
+void AKeepGoingUpCharacter::DecreaseGameSpeed()
+{
+	if (!bRunGameplayEnabled)
+	{
+		return;
+	}
+	SpeedGear = FMath::Max(SpeedGear - 1, 0);
+	ApplyGameSpeed();
+}
+
+void AKeepGoingUpCharacter::ApplyGameSpeed() const
+{
+	const float Scale = GameSpeedGears[FMath::Clamp(SpeedGear, 0, GameSpeedGearCount - 1)];
+	UGameplayStatics::SetGlobalTimeDilation(this, Scale);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(-1, 1.2f, FColor::White, FString::Printf(TEXT("x%d"), FMath::RoundToInt(Scale)));
+	}
+}
+
+void AKeepGoingUpCharacter::ResetGameSpeed()
+{
+	SpeedGear = 0;
+	UGameplayStatics::SetGlobalTimeDilation(this, 1.f);
 }
 
 void AKeepGoingUpCharacter::SetRunGameplayEnabled(bool bEnabled, bool bAllowCamera)
@@ -843,6 +888,25 @@ void AKeepGoingUpCharacter::StartPushPrank(EKeepGoingUpPushPrankKind Kind)
 	UE_LOG(LogKeepGoingUp, Log, TEXT("Prank: kind %d spawned (active=%d)"), static_cast<int32>(Kind), ActivePushPranks.Num());
 }
 
+void AKeepGoingUpCharacter::SetHeldPitHp(int32 NewHp)
+{
+	if (bHeldAtStartPit && !bStartPitFailing)
+	{
+		StartPitHp = FMath::Max(1, NewHp);
+	}
+}
+
+void AKeepGoingUpCharacter::ApplyPrankSoundVolume(float Volume)
+{
+	for (AKeepGoingUpPushPrank* Prank : ActivePushPranks)
+	{
+		if (Prank)
+		{
+			Prank->ApplySoundVolume(Volume);
+		}
+	}
+}
+
 void AKeepGoingUpCharacter::CancelAllPushPranks()
 {
 	for (AKeepGoingUpPushPrank* Prank : ActivePushPranks)
@@ -875,7 +939,15 @@ void AKeepGoingUpCharacter::ClearStartPit()
 {
 	bHeldAtStartPit = false;
 	bStartPitFailing = false;
+	StartPitReleaseDelay = 0.f;
 	StartPitHp = 10000;
+	if (UWorld* World = GetWorld())
+	{
+		if (const AKeepGoingUpGameMode* GameMode = World->GetAuthGameMode<AKeepGoingUpGameMode>())
+		{
+			StartPitHp = GameMode->GetStartPitMaxHp();
+		}
+	}
 	LastDisplayedDistance = INDEX_NONE;
 
 	if (UCharacterMovementComponent* MoveComp = GetCharacterMovement())
@@ -956,7 +1028,15 @@ void AKeepGoingUpCharacter::EnterStartPit()
 	}
 
 	bHeldAtStartPit = true;
+	StartPitReleaseDelay = 0.f;
 	StartPitHp = 10000;
+	if (UWorld* World = GetWorld())
+	{
+		if (const AKeepGoingUpGameMode* GameMode = World->GetAuthGameMode<AKeepGoingUpGameMode>())
+		{
+			StartPitHp = GameMode->GetStartPitMaxHp();
+		}
+	}
 	LastDisplayedDistance = INDEX_NONE;
 	// Hit flag drives the car-hit animation. Camera stays fixed; mouse look stays off.
 	if (!bCarPushLocked)
@@ -1056,13 +1136,9 @@ void AKeepGoingUpCharacter::ReleaseStartPitToFirstTile()
 	const FVector WorldLocation = CachedMapCreater->RoadLocalToWorld(Local);
 	const FRotator RoadRotation = CachedMapCreater->GetActorRotation();
 	TeleportTo(WorldLocation, RoadRotation, false, true);
-	if (CameraBoom)
-	{
-		CameraBoom->bUsePawnControlRotation = false;
-		CameraBoom->SetRelativeRotation(FRotator(CarHitCameraPitch, CarHitCameraYaw, 0.f));
-	}
+	StartPitReleaseDelay = 0.f;
 
-	UE_LOG(LogKeepGoingUp, Log, TEXT("Start pit: forward push, teleport to first tile."));
+	UE_LOG(LogKeepGoingUp, Log, TEXT("Start pit: no knockback, return to first tile."));
 }
 
 void AKeepGoingUpCharacter::FailFromStartPit()
@@ -1087,7 +1163,7 @@ void AKeepGoingUpCharacter::FailFromStartPit()
 	}
 }
 
-void AKeepGoingUpCharacter::TickStartPitHold(int32 ForwardTypes, int32 BackwardTypes)
+void AKeepGoingUpCharacter::TickStartPitHold(bool bHasKnockback, bool bKnockbackWins, float DeltaSeconds)
 {
 	if (bStartPitFailing)
 	{
@@ -1095,20 +1171,26 @@ void AKeepGoingUpCharacter::TickStartPitHold(int32 ForwardTypes, int32 BackwardT
 		return;
 	}
 
-	if (ForwardTypes > BackwardTypes)
+	if (bHasKnockback)
 	{
-		ReleaseStartPitToFirstTile();
+		StartPitReleaseDelay = 0.f;
+		SnapToStartPit();
+		if (bKnockbackWins && StartPitHp > 0)
+		{
+			--StartPitHp;
+			if (StartPitHp <= 0)
+			{
+				FailFromStartPit();
+			}
+		}
 		return;
 	}
 
 	SnapToStartPit();
-	if (BackwardTypes > ForwardTypes && StartPitHp > 0)
+	StartPitReleaseDelay += DeltaSeconds;
+	if (StartPitReleaseDelay >= 1.f)
 	{
-		--StartPitHp;
-		if (StartPitHp <= 0)
-		{
-			FailFromStartPit();
-		}
+		ReleaseStartPitToFirstTile();
 	}
 }
 
@@ -1134,38 +1216,79 @@ void AKeepGoingUpCharacter::TickPushPranks(float DeltaSeconds)
 		}
 	}
 
-	// One vote per pushing kind. Extra copies of the same kind only keep that side alive longer.
-	uint32 ForwardMask = 0;
-	uint32 BackwardMask = 0;
+	// Only the highest rank currently pushing decides the direction.
+	// Cat/turtle < rocket/missile < boar/leaf < Goku/Vegeta < Naruto/Sasuke.
+	// A lower rank does nothing while a higher one is pushing. Same rank on both sides stalemates.
+	int32 BestRank = 0;
+	bool bTopForward = false;
+	bool bTopBackward = false;
 	for (AKeepGoingUpPushPrank* Prank : ActivePushPranks)
 	{
-		if (!Prank)
+		if (!Prank || (!Prank->IsPushingForward() && !Prank->IsPushingBackward()))
 		{
 			continue;
 		}
-		const uint32 Bit = 1u << static_cast<uint32>(Prank->GetKind());
-		if (Prank->IsPushingForward())
+
+		int32 Rank = 1;
+		switch (Prank->GetKind())
 		{
-			ForwardMask |= Bit;
+		case EKeepGoingUpPushPrankKind::Rocket:
+		case EKeepGoingUpPushPrankKind::Missile:
+			Rank = 2;
+			break;
+		case EKeepGoingUpPushPrankKind::ZhuTuMengJin:
+		case EKeepGoingUpPushPrankKind::LuoYeZhan:
+			Rank = 3;
+			break;
+		case EKeepGoingUpPushPrankKind::SaiYaRen:
+		case EKeepGoingUpPushPrankKind::BeiJiTa:
+			Rank = 4;
+			break;
+		case EKeepGoingUpPushPrankKind::Naruto:
+		case EKeepGoingUpPushPrankKind::Sasuke:
+			Rank = 5;
+			break;
+		default:
+			Rank = 1;
+			break;
 		}
-		else if (Prank->IsPushingBackward())
+
+		if (Rank > BestRank)
 		{
-			BackwardMask |= Bit;
+			BestRank = Rank;
+			bTopForward = Prank->IsPushingForward();
+			bTopBackward = Prank->IsPushingBackward();
+		}
+		else if (Rank == BestRank)
+		{
+			bTopForward |= Prank->IsPushingForward();
+			bTopBackward |= Prank->IsPushingBackward();
 		}
 	}
 
-	const int32 ForwardTypes = FMath::CountBits(ForwardMask);
-	const int32 BackwardTypes = FMath::CountBits(BackwardMask);
-	const bool bStalemate = ForwardTypes > 0 && BackwardTypes > 0 && ForwardTypes == BackwardTypes;
-	const bool bPushing = ForwardTypes > 0 || BackwardTypes > 0;
+	const bool bStalemate = bTopForward && bTopBackward;
+	const bool bPushing = bTopForward || bTopBackward;
+	const int32 ForwardTypes = bTopForward && !bTopBackward ? 1 : 0;
+	const int32 BackwardTypes = bTopBackward && !bTopForward ? 1 : 0;
 	bPushPrankLockingMove = bPushing;
 
 	if (bHeldAtStartPit)
 	{
-		TickStartPitHold(ForwardTypes, BackwardTypes);
+		TickStartPitHold(bTopBackward, bTopBackward && !bTopForward, DeltaSeconds);
 		if (bHeldAtStartPit || bStartPitFailing)
 		{
 			return;
+		}
+
+		// A push that carries the player out of the pit keeps the fixed hit camera.
+		if (bPushing)
+		{
+			bPrankUsingCarHit = false;
+			bCarPushLocked = false;
+		}
+		else
+		{
+			EndCarPush();
 		}
 	}
 
