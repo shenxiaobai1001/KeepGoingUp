@@ -1,0 +1,28 @@
+{
+	"FileVersion": 3,
+	"Version": 2,
+	"VersionName": "1.0.12-5.8",
+	"FriendlyName": "WebSocketServer",
+	"Description": "Create a WebSocket Server and serve WebSocket clients in your Unreal Engine application. Adapted for UE 5.8.",
+	"Category": "Networking",
+	"CreatedBy": "Pandores (adapted for UE 5.8)",
+	"CreatedByURL": "https://www.unrealengine.com/marketplace/en-US/profile/Pandores?count=50&sortBy=effectiveDate&sortDir=DESC&start=0",
+	"DocsURL": "https://pandoa.github.io/WebSocketServer/",
+	"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/0c02d8c1c8d74fd4aff3cfcb0a3c40e1",
+	"SupportURL": "mailto:pandores.marketplace@gmail.com",
+	"EngineVersion": "5.8.0",
+	"CanContainContent": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "WebSocketServer",
+			"Type": "Runtime",
+			"LoadingPhase": "PreDefault",
+			"PlatformAllowList": [
+				"Win64",
+				"Linux",
+				"Mac"
+			]
+		}
+	]
+}

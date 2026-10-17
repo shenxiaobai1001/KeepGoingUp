@@ -1,0 +1,44 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.8",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "KeepGoingUp",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine",
+				"AIModule",
+				"UMG"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ModelingToolsEditorMode",
+			"Enabled": true,
+			"TargetAllowList": [
+				"Editor"
+			]
+		},
+		{
+			"Name": "StateTree",
+			"Enabled": true
+		},
+		{
+			"Name": "GameplayStateTree",
+			"Enabled": true
+		},
+		{
+			"Name": "PythonScriptPlugin",
+			"Enabled": true
+		},
+		{
+			"Name": "WebSocketServer",
+			"Enabled": true,
+			"MarketplaceURL": "com.epicgames.launcher://ue/marketplace/product/0c02d8c1c8d74fd4aff3cfcb0a3c40e1"
+		}
+	]
+}

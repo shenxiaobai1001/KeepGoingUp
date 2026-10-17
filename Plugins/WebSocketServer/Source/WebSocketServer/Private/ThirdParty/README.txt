@@ -1,0 +1,1 @@
+This directory contains the ThirdParty Library "uWebSockets" and its dependencies directly included in the build.

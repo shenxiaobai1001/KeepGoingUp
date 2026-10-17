@@ -1,0 +1,40 @@
+# Unreal Engine generated / local files
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+.vscode/
+.idea/
+
+# Generated project files
+*.sln
+*.slnx
+*.suo
+*.opensdf
+*.opendb
+*.sdf
+*.VC.db
+*.VC.VC.opendb
+*.code-workspace
+*.xcworkspace
+*.xcodeproj
+
+# Build artifacts
+*.pdb
+*.obj
+*.exp
+*.lib
+*.idb
+*.ilk
+*.recipe
+*.tlog
+
+# Local archives and OS junk
+_Archive/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.tmp
+*.log
